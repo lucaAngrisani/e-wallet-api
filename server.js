@@ -62,17 +62,19 @@ app.get("/json/:name", async (req, res) => {
 app.post(
   "/json/:name",
   raw({ type: "application/json", limit: "32mb" }),
-  (req, res) => {
+  async (req, res) => {
     try {
-      const ws = bucket
-        .file(req.params.name)
-        .createWriteStream({ contentType: "application/json" });
+      const file = bucket.file(req.params.name);
+      const [exists] = await file.exists();
+
+      // Se il file non esiste, lo crea comunque
+      const ws = file.createWriteStream({ contentType: "application/json" });
       ws.on("error", (e) => {
         console.error(e);
         res.status(500).json({ error: "write_failed" });
       });
-      ws.on("finish", () => res.json({ ok: true, name: req.params.name }));
-      ws.end(req.body); // <-- qui req.body è Buffer
+      ws.on("finish", () => res.json({ ok: true, name: req.params.name, created: !exists }));
+      ws.end(req.body); // req.body è Buffer
     } catch (e) {
       console.error(e);
       res.status(500).json({ error: "write_failed" });
